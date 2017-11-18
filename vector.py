@@ -23,6 +23,20 @@ class Vector(object):
         except TypeError:
             raise TypeError('The coordinates must be an iterable')
 
+    def __iter__(self):
+        self.current = 0
+        return self
+
+    def __next__(self):
+        if self.current >= len(self.coordinates):
+            raise StopIteration
+        else:
+            current_value = self.coordinates[self.current]
+            self.current += 1
+            return current_value
+
+    def __getitem__(self, i):
+        return self.coordinates[i]
 
     def __str__(self):
         return 'Vector: {}'.format([round(c,3) for c in self.coordinates])

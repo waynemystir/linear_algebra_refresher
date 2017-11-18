@@ -30,8 +30,8 @@ class Line(object):
             c = self.constant_term
             basepoint_coords = ['0']*self.dimension
 
-            initial_index = Line.first_nonzero_index(n.coordinates)
-            initial_coefficient = n.coordinates[initial_index]
+            initial_index = Line.first_nonzero_index(n)
+            initial_coefficient = n[initial_index]
 
             basepoint_coords[initial_index] = c/initial_coefficient
             self.basepoint = Vector(basepoint_coords)
@@ -95,9 +95,9 @@ class Line(object):
         n = self.normal_vector
 
         try:
-            initial_index = Line.first_nonzero_index(n.coordinates)
-            terms = [write_coefficient(n.coordinates[i], is_initial_term=(i==initial_index)) + 'x_{}'.format(i+1)
-                     for i in range(self.dimension) if round(n.coordinates[i], num_decimal_places) != 0]
+            initial_index = Line.first_nonzero_index(n)
+            terms = [write_coefficient(n[i], is_initial_term=(i==initial_index)) + 'x_{}'.format(i+1)
+                     for i in range(self.dimension) if round(n[i], num_decimal_places) != 0]
             output = ' '.join(terms)
 
         except Exception as e:
@@ -127,10 +127,10 @@ class Line(object):
     def intersection_point(self, other):
         if not self.is_parallel_with(other):
             # then we must find the single point of intersection
-            A = self.normal_vector.coordinates[0]
-            B = self.normal_vector.coordinates[1]
-            C = other.normal_vector.coordinates[0]
-            D = other.normal_vector.coordinates[1]
+            A = self.normal_vector[0]
+            B = self.normal_vector[1]
+            C = other.normal_vector[0]
+            D = other.normal_vector[1]
             k1, k2 = self.constant_term, other.constant_term
             det = A*D - B*C
             x = (D * k1 - B * k2) / det

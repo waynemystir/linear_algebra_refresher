@@ -30,8 +30,8 @@ class Plane(object):
             c = self.constant_term
             basepoint_coords = ['0']*self.dimension
 
-            initial_index = Plane.first_nonzero_index(n.coordinates)
-            initial_coefficient = n.coordinates[initial_index]
+            initial_index = Plane.first_nonzero_index(n)
+            initial_coefficient = n[initial_index]
 
             basepoint_coords[initial_index] = c/initial_coefficient
             self.basepoint = Vector(basepoint_coords)
@@ -144,7 +144,7 @@ def test_parallel_equal():
     p1 = Plane(normal_vector=v, constant_term=-7.952)
     w = Vector([-2.642, 2.875, -2.405666])
     p2 = Plane(normal_vector=w, constant_term=-2.651)
-    wayne = [round(c/3,3) for c in v.coordinates]
+    wayne = [round(c/3,3) for c in v]
     print("parallel.3({}) equal({})".format(p1.is_parallel_with(p2), p1==p2))
 
 def test():
