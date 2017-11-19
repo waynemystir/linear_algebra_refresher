@@ -23,6 +23,11 @@ class Plane(object):
 
         self.set_basepoint()
 
+    def __getitem__(self, i):
+        return self.normal_vector[i]
+
+    def __setitem__(self, i, val):
+        self.normal_vector[i] = val
 
     def set_basepoint(self):
         try:
@@ -114,6 +119,11 @@ class Plane(object):
 
     def is_parallel_with(self, other):
         return self.normal_vector.is_parallel_to(other.normal_vector, tolerance=1e-4)
+
+    def add(self, other):
+        nv = self.normal_vector.plus(other.normal_vector)
+        ct = self.constant_term + other.constant_term
+        return Plane(normal_vector=nv, constant_term=ct)
 
     @staticmethod
     def first_nonzero_index(iterable):
