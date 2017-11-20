@@ -21,6 +21,7 @@ class LinearSystem(object):
 
             self.planes = planes
             self.dimension = d
+            self.wc = 0
 
         except AssertionError:
             raise Exception(self.ALL_PLANES_MUST_BE_IN_SAME_DIM_MSG)
@@ -44,21 +45,63 @@ class LinearSystem(object):
     def compute_triangular_form(self):
         system = deepcopy(self)
         still_working = True
+        print("BBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+        print(self)
+
+        while len(self) > 3:
+            # Let's reduce this to 3 equations
+            # But we don't want to change those
+            # planes with some zero coefficients 
+            # because they are already candidates
+            # for the final triangle.
+            # So let's get the planes with the most
+            # non-zero coefficients. 
+            # First we'll get a sorted list of 
+            # indices, from least to most, whose
+            # corresponding plane has so many
+            # nonzero coefficients
+            L = self.sorted_indices_num_nonzero_terms_each_row_min_to_max()
+            # Now we get the list of indices we wish to condense
+            # The indices we want are at the tail of this list
+            # because the list is least to most.
+            idxs_to_condense = L[(2 - len(self)):]
+            # Now we get the list of planes we wish to condense
+            planes_to_condense = [self[i] for i in idxs_to_condense]
+
+            # now we condense em
+            for i,p in enumerate(planes_to_condense):
+                the_condensed_plane = p if i == 0 else p.add(the_condensed_plane)
+
+            for idx in idxs_to_condense:
+                self.planes.pop(idx)
+
+            # And finally, let's add the_condensed_plane to the list
+            self.planes.append(the_condensed_plane)
 
         while still_working:
             n0x = self.indices_of_first_nonzero_terms_in_each_row()
+            print("n0x ({}) ({})".format(self.wc, n0x))
+            self.wc += 1
+            if self.wc >= 5: return system, False
             if 0 in n0x and sum(n0x) == 3:
                 # so we have some combination of [0,1,2]
                 # first let's make it exactly [0,1,2]
                 if n0x[0] != 0:
                     if n0x[1] == 0:
                         self.swap_rows(0,1)
+                        n0x[0], n0x[1] = n0x[1], n0x[0]
                     else:
                         self.swap_rows(0,2)
+                        n0x[0], n0x[2] = n0x[2], n0x[0]
                 if n0x[1] != 1:
                     self.swap_rows(1,2)
+                    n0x[1], n0x[2] = n0x[2], n0x[1]
                 # and now we have the desired triangular form
-                return system, True
+                w0x = self.indices_of_first_nonzero_terms_in_each_row()
+                print("www000xxx ({})".format(w0x))
+                print("nnn000xxx ({})".format(n0x))
+                print(self)
+                return self, True
             elif 0 not in n0x:
                 # none of the planes has all the
                 # variables
@@ -73,13 +116,17 @@ class LinearSystem(object):
                     if n0x[0] != 0:
                         self.swap_rows(0,1)
                         n0x[0], n0x[1] = n0x[1], n0x[0]
+                    print("s21a.{}".format(self.indices_of_first_nonzero_terms_in_each_row()))
+                    print(self)
                     # now let's make [0, 1, 2]
-                    p1 = self[0]
+                    p2 = self[1]
                     p3 = self[2]
-                    x1,x3 = p1[0], p3[0]
-                    coefficient = -x3/x1
-                    self.add_multiple_times_row_to_row(coefficient, 0, 2)
+                    y2,y3 = p2[1], p3[1]
+                    coefficient = -y3/y2
+                    self.add_multiple_times_row_to_row(coefficient, 1, 2)
                     # and the next loop will see [0, 1, 2]
+                    print("s21c.{}".format(self.indices_of_first_nonzero_terms_in_each_row()))
+                    print(self)
                 else:
                     # first let's make it exactly [0, 0, 2]
                     if n0x[2] != 2:
@@ -96,6 +143,7 @@ class LinearSystem(object):
                     coefficient = -x2/x1
                     self.add_multiple_times_row_to_row(coefficient, 0, 1)
                     # and the next loop will see [0, 1, 2]
+                    print("s22.{}".format(self.indices_of_first_nonzero_terms_in_each_row()))
             elif sum(n0x) == 1:
                 # some combination of [0, 0, 1]
                 # first let's make it exactly [0, 0, 1]
@@ -115,6 +163,8 @@ class LinearSystem(object):
                 print("108 - tp1({}) tp2({}) x1({}) x2({}) coeff({})".format(type(p1), type(p2), x1, x2, coefficient))
                 self.add_multiple_times_row_to_row(coefficient, 0, 1)
                 # and the next loop will see [0, 1, 1]
+                print("07")
+                print(self)
             else:
                 # all zeros [0, 0, 0]
                 p1 = self[0]
@@ -125,6 +175,17 @@ class LinearSystem(object):
                 # and the next loop will see [0, 0, 1]
 
         return system, False
+
+    def sorted_indices_num_nonzero_terms_each_row_min_to_max(self):
+        L = self.num_nonzero_terms_each_row()
+        print("LLLLLLLLLLLLLLLLLLLLL ({})".format(L))
+        return sorted(range(len(L)), key=lambda i:L[i])
+
+    def num_nonzero_terms_each_row(self):
+        lst = []
+        for p in self.planes:
+            lst.append(sum([1 if c != 0 else 0 for c in p]))
+        return lst
 
     def indices_of_first_nonzero_terms_in_each_row(self):
         num_equations = len(self)
@@ -267,15 +328,29 @@ def test_row_ops():
     else: print('test case 10 PASSED')
 
 def test_triangular_form():
+    p1 = Plane(normal_vector=Vector(['1','1','1']), constant_term='1')
+    p2 = Plane(normal_vector=Vector(['0','1','0']), constant_term='2')
+    p3 = Plane(normal_vector=Vector(['1','1','-1']), constant_term='3')
+    p4 = Plane(normal_vector=Vector(['1','0','-2']), constant_term='2')
+    s = LinearSystem([p1,p2,p3,p4])
+    t,w = s.compute_triangular_form()
+    if not (t[0] == p1 and
+            t[1] == p2 and
+            t[2] == Plane(normal_vector=Vector(['0','0','-2']), constant_term='2') and
+            t[3] == Plane()):
+        print('test case 3 failed')
+
     p1 = Plane(normal_vector=Vector(['0','1','1']), constant_term='1')
     p2 = Plane(normal_vector=Vector(['1','-1','1']), constant_term='2')
     p3 = Plane(normal_vector=Vector(['1','2','-5']), constant_term='3')
     s = LinearSystem([p1,p2,p3])
-    t = s.compute_triangular_form()
+    t,w = s.compute_triangular_form()
+    print("WWWWWWWWWWWWWWWW t({}) w({})".format(t, w))
     if not (t[0] == Plane(normal_vector=Vector(['1','-1','1']), constant_term='2') and
             t[1] == Plane(normal_vector=Vector(['0','1','1']), constant_term='1') and
             t[2] == Plane(normal_vector=Vector(['0','0','-9']), constant_term='-2')):
         print('test case 4 failed')
+
 
 def test():
     test_row_ops()
