@@ -44,8 +44,65 @@ class LinearSystem(object):
 
     def compute_triangular_form(self):
         system = deepcopy(self)
+        num_equations = len(system)
+        num_variables = system.dimension
+
+        col = 0
+        for row in range(num_equations):
+            while col < num_variables:
+                c = MyDecimal(system[row].normal_vector[col])
+                if c.is_near_zero():
+                    swap_succeeded = system.swap_with_row_below_for_nonzero_coefficient_if_able(row, col)
+                    if not swap_succeeded:
+                        col += 1
+                        continue
+
+                system.clear_coefficients_below(row, col)
+                col += 1
+                break
+
+        return system
+
+    def swap_with_row_below_for_nonzero_coefficient_if_able(self, given_row, col):
+        for row in range(given_row + 1, len(self)):
+            c2 = MyDecimal(self[row][col])
+            if not c2.is_near_zero():
+                self.swap_rows(given_row, row)
+                return True
+        return False
+
+    def clear_coefficients_below(self, given_row, col):
+        c1 = MyDecimal(self[given_row][col])
+        for row in range(given_row + 1, len(self)):
+            c2 = MyDecimal(self[row][col])
+            c = -c2/c1
+            self.add_multiple_times_row_to_row(c, given_row, row)
+
+    def clear_coefficients_above(self, given_row, col):
+        for row in range(given_row)[::-1]:
+            c2 = MyDecimal(-self[row][col])
+            self.add_multiple_times_row_to_row(c2, given_row, row)
+
+    def compute_rref(self):
+        tf = self.compute_triangular_form()
+        pivot_indices = tf.indices_of_first_nonzero_terms_in_each_row()
+        for row in range(len(tf))[::-1]:
+            pivot_var = pivot_indices[row]
+            if pivot_var < 0:
+                continue
+            tf.scale_row_to_make_coefficient_equal_one(row, pivot_var)
+            tf.clear_coefficients_above(row, pivot_var)
+        return tf
+
+    def scale_row_to_make_coefficient_equal_one(self, row, col):
+        n = self[row].normal_vector
+        beta = Decimal('1.0') / n[col]
+        self.multiply_coefficient_and_row(beta, row)
+
+    def compute_triangular_form_original(self):
+        system = deepcopy(self)
         still_working = True
-        print("BBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+        print("compute_triangular_form_original_BEGIN")
         print(self)
 
         while len(self) > 3:
@@ -253,6 +310,7 @@ print(MyDecimal('1e-9').is_near_zero())
 print(MyDecimal('1e-11').is_near_zero())
 
 def test_row_ops():
+    print("TEST ROW OPS")
     p0 = Plane(normal_vector=Vector(['1','1','1']), constant_term='1')
     p1 = Plane(normal_vector=Vector(['0','1','0']), constant_term='2')
     p2 = Plane(normal_vector=Vector(['1','1','-1']), constant_term='3')
@@ -328,6 +386,50 @@ def test_row_ops():
     else: print('test case 10 PASSED')
 
 def test_triangular_form():
+    print("TEST TRIANGULAR FORM")
+    p1 = Plane(normal_vector=Vector(['1','1','1']), constant_term='1')
+    p2 = Plane(normal_vector=Vector(['0','1','1']), constant_term='2')
+    s = LinearSystem([p1,p2])
+    t = s.compute_triangular_form()
+    if not (t[0] == p1 and
+            t[1] == p2):
+        print('test case 1 failed')
+    else: print('test case 1 PASSED')
+    
+    p1 = Plane(normal_vector=Vector(['1','1','1']), constant_term='1')
+    p2 = Plane(normal_vector=Vector(['1','1','1']), constant_term='2')
+    s = LinearSystem([p1,p2])
+    t = s.compute_triangular_form()
+    if not (t[0] == p1 and
+            t[1] == Plane(constant_term='1')):
+        print('test case 2 failed')
+    else: print('test case 2 PASSED')
+    
+    p1 = Plane(normal_vector=Vector(['1','1','1']), constant_term='1')
+    p2 = Plane(normal_vector=Vector(['0','1','0']), constant_term='2')
+    p3 = Plane(normal_vector=Vector(['1','1','-1']), constant_term='3')
+    p4 = Plane(normal_vector=Vector(['1','0','-2']), constant_term='2')
+    s = LinearSystem([p1,p2,p3,p4])
+    t = s.compute_triangular_form()
+    if not (t[0] == p1 and
+            t[1] == p2 and
+            t[2] == Plane(normal_vector=Vector(['0','0','-2']), constant_term='2') and
+            t[3] == Plane()):
+        print('test case 3 failed')
+    else: print('test case 3 PASSED')
+    
+    p1 = Plane(normal_vector=Vector(['0','1','1']), constant_term='1')
+    p2 = Plane(normal_vector=Vector(['1','-1','1']), constant_term='2')
+    p3 = Plane(normal_vector=Vector(['1','2','-5']), constant_term='3')
+    s = LinearSystem([p1,p2,p3])
+    t = s.compute_triangular_form()
+    if not (t[0] == Plane(normal_vector=Vector(['1','-1','1']), constant_term='2') and
+            t[1] == Plane(normal_vector=Vector(['0','1','1']), constant_term='1') and
+            t[2] == Plane(normal_vector=Vector(['0','0','-9']), constant_term='-2')):
+        print('test case 4 failed')
+    else: print('test case 4 PASSED')
+
+def test_triangular_form_original():
     p1 = Plane(normal_vector=Vector(['1','1','1']), constant_term='1')
     p2 = Plane(normal_vector=Vector(['0','1','0']), constant_term='2')
     p3 = Plane(normal_vector=Vector(['1','1','-1']), constant_term='3')
@@ -351,10 +453,72 @@ def test_triangular_form():
             t[2] == Plane(normal_vector=Vector(['0','0','-9']), constant_term='-2')):
         print('test case 4 failed')
 
+def test_rref():
+    print("TEST REDUCED ROW ECHELON FORM")
+    p1 = Plane(normal_vector=Vector(['1', '1', '1']), constant_term='1')
+    p2 = Plane(normal_vector=Vector(['0', '1', '1']), constant_term='2')
+    s = LinearSystem([p1, p2])
+    r = s.compute_rref()
+    if not (r[0] == Plane(normal_vector=Vector(['1', '0', '0']),
+                          constant_term='-1') and
+            r[1] == p2):
+        print('test case 1 failed')
+    else: print('test case 2 PASSED')
+    
+    p1 = Plane(normal_vector=Vector(['1', '1', '1']), constant_term='1')
+    p2 = Plane(normal_vector=Vector(['1', '1', '1']), constant_term='2')
+    s = LinearSystem([p1, p2])
+    r = s.compute_rref()
+    if not (r[0] == p1 and
+            r[1] == Plane(constant_term='1')):
+        print('test case 2 failed')
+    else: print('test case 2 PASSED')
+    
+    p1 = Plane(normal_vector=Vector(['1', '1', '1']), constant_term='1')
+    p2 = Plane(normal_vector=Vector(['0', '1', '0']), constant_term='2')
+    p3 = Plane(normal_vector=Vector(['1', '1', '-1']), constant_term='3')
+    p4 = Plane(normal_vector=Vector(['1', '0', '-2']), constant_term='2')
+    s = LinearSystem([p1, p2, p3, p4])
+    r = s.compute_rref()
+    if not (r[0] == Plane(normal_vector=Vector(['1', '0', '0']),
+                          constant_term='0') and
+            r[1] == p2 and
+            r[2] == Plane(normal_vector=Vector(['0', '0', '-2']),
+                          constant_term='2') and
+            r[3] == Plane()):
+        print('test case 3 failed')
+    else: print('test case 3 PASSED')
+    
+    p1 = Plane(normal_vector=Vector(['0', '1', '1']), constant_term='1')
+    p2 = Plane(normal_vector=Vector(['1', '-1', '1']), constant_term='2')
+    p3 = Plane(normal_vector=Vector(['1', '2', '-5']), constant_term='3')
+    s = LinearSystem([p1, p2, p3])
+    r = s.compute_rref()
+    if not (r[0] == Plane(normal_vector=Vector(['1', '0', '0']),
+                          constant_term=Decimal('23') / Decimal('9')) and
+            r[1] == Plane(normal_vector=Vector(['0', '1', '0']),
+                          constant_term=Decimal('7') / Decimal('9')) and
+            r[2] == Plane(normal_vector=Vector(['0', '0', '1']),
+                          constant_term=Decimal('2') / Decimal('9'))):
+        print('test case 4 failed')
+    else: print('test case 4 PASSED')
+
+def test_rref_xtra():
+    p1 = Plane(normal_vector=Vector(['17', '14', '-13']), constant_term='13')
+    p2 = Plane(normal_vector=Vector(['-3', '1', '-19']), constant_term='-1')
+    p3 = Plane(normal_vector=Vector(['8', '7', '21']), constant_term='11')
+    s = LinearSystem([p1, p2, p3])
+    r = s.compute_rref()
+    print("test_rref_xtra")
+    print(r)
+
 
 def test():
     test_row_ops()
+#    test_triangular_form_original()
     test_triangular_form()
+    test_rref()
+    test_rref_xtra()
 
 if __name__ == '__main__':
     test()
