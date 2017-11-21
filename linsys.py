@@ -99,6 +99,43 @@ class LinearSystem(object):
         beta = Decimal('1.0') / n[col]
         self.multiply_coefficient_and_row(beta, row)
 
+    def do_gaussian_elimination(self):
+        rref = self.compute_rref()
+
+        try:
+            rref.raise_excepion_if_contradictory_equation()
+            rref.raise_excepion_if_too_few_pivots()
+        except Exception as e:
+            return str(e)
+
+        num_variables = rref.dimension
+        solution_coordinates = [rref.planes[i].constant_term
+                                for i in range(num_variables)]
+
+        return Vector(solution_coordinates)
+
+    def raise_excepion_if_contradictory_equation(self):
+        for plane in self.planes:
+            try:
+                plane.first_nonzero_index(plane.normal_vector)
+
+            except Exception as e:
+                if str(e) == 'No nonzero elements found':
+                    constant_term = MyDecimal(plane.constant_term)
+                    if not constant_term.is_near_zero():
+                        raise Exception(self.NO_SOLUTIONS_MSG)
+
+                else:
+                    raise e
+
+    def raise_excepion_if_too_few_pivots(self):
+        pivot_indices = self.indices_of_first_nonzero_terms_in_each_row()
+        num_pivots = sum([1 if index >= 0 else 0 for index in pivot_indices])
+        num_variables = self.dimension
+
+        if num_pivots < num_variables:
+            raise Exception(self.INF_SOLUTIONS_MSG)
+
     def compute_triangular_form_original(self):
         system = deepcopy(self)
         still_working = True
@@ -512,6 +549,28 @@ def test_rref_xtra():
     print("test_rref_xtra")
     print(r)
 
+def test_guassian_elim():
+    # first system
+    p1 = Plane(Vector([5.862, 1.178, -10.366]), -8.15)
+    p2 = Plane(Vector([-2.931, -0.589, 5.183]), -4.075)
+    system1 = LinearSystem([p1, p2])
+    print('first system: {}'.format(system1.do_gaussian_elimination()))
+
+    # # second system
+    p1 = Plane(Vector([8.631, 5.112, -1.816]), -5.113)
+    p2 = Plane(Vector([4.315, 11.132, -5.27]), -6.775)
+    p3 = Plane(Vector([-2.158, 3.01, -1.727]), -0.831)
+    system2 = LinearSystem([p1, p2, p3])
+    print('second system: {}'.format(system2.do_gaussian_elimination()))
+
+    # third system
+    p1 = Plane(Vector([5.262, 2.739, -9.878]), -3.441)
+    p2 = Plane(Vector([5.111, 6.358, 7.638]), -2.152)
+    p3 = Plane(Vector([2.016, -9.924, -1.367]), -9.278)
+    p4 = Plane(Vector([2.167, -13.543, -18.883]), -10.567)
+    system3 = LinearSystem([p1, p2, p3, p4])
+    print('third system: {} '.format(system3.do_gaussian_elimination()))
+
 
 def test():
     test_row_ops()
@@ -519,6 +578,7 @@ def test():
     test_triangular_form()
     test_rref()
     test_rref_xtra()
+    test_guassian_elim()
 
 if __name__ == '__main__':
     test()
