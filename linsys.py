@@ -136,6 +136,59 @@ class LinearSystem(object):
         if num_pivots < num_variables:
             raise Exception(self.INF_SOLUTIONS_MSG)
 
+    def compute_solution(self):
+        try:
+            return self.do_gaussian_elimination_and_parametrization()
+
+        except Exception as e:
+            if str(e) == self.NO_SOLUTIONS_MSG:
+                return str(e)
+            else:
+                raise e
+
+    def do_gaussian_elimination_and_parametrization(self):
+        rref = self.compute_rref()
+        rref.raise_excepion_if_contradictory_equation()
+
+        direction_vectors = rref.extract_direction_vectors_for_parametrization()  # NOQA
+        basepoint = rref.extract_basepoint_for_parametrization()
+
+        return Parametrization(basepoint, direction_vectors)
+
+    def extract_direction_vectors_for_parametrization(self):
+        num_variables = self.dimension
+        pivot_indices = self.indices_of_first_nonzero_terms_in_each_row()
+        free_variable_indices = set(range(num_variables)) - set(pivot_indices)
+
+        direction_vectors = []
+
+        for free_var in free_variable_indices:
+            vector_coords = [0] * num_variables
+            vector_coords[free_var] = 1
+            for index, plane in enumerate(self.planes):
+                pivot_var = pivot_indices[index]
+                if pivot_var < 0:
+                    break
+                vector_coords[pivot_var] = -plane.normal_vector[free_var]
+
+            direction_vectors.append(Vector(vector_coords))
+
+        return direction_vectors
+
+    def extract_basepoint_for_parametrization(self):
+        num_variables = self.dimension
+        pivot_indices = self.indices_of_first_nonzero_terms_in_each_row()
+
+        basepoint_coords = [0] * num_variables
+
+        for index, plane in enumerate(self.planes):
+            pivot_var = pivot_indices[index]
+            if pivot_var < 0:
+                break
+            basepoint_coords[pivot_var] = plane.constant_term
+
+        return Vector(basepoint_coords)
+
     def compute_triangular_form_original(self):
         system = deepcopy(self)
         still_working = True
@@ -326,6 +379,38 @@ class LinearSystem(object):
 class MyDecimal(Decimal):
     def is_near_zero(self, eps=1e-10):
         return abs(self) < eps
+
+
+class Parametrization(object):
+
+    BASEPT_AND_DIR_VECTORS_MUST_BE_IN_SAME_DIM = (
+        'The basepoint and direction vectors should all live in the same '
+        'dimension')
+
+    def __init__(self, basepoint, direction_vectors):
+
+        self.basepoint = basepoint
+        self.direction_vectors = direction_vectors
+        self.dimension = self.basepoint.dimension
+
+        try:
+            for v in direction_vectors:
+                assert v.dimension == self.dimension
+
+        except AssertionError:
+            raise Exception(self.BASEPT_AND_DIR_VECTORS_MUST_BE_IN_SAME_DIM)
+
+    def __str__(self):
+
+        output = ''
+        for coord in range(self.dimension):
+            output += 'x_{} = {} '.format(coord + 1,
+                                          round(self.basepoint[coord], 3))
+            for free_var, vector in enumerate(self.direction_vectors):
+                output += '+ {} t_{}'.format(round(vector[coord], 3),
+                                             free_var + 1)
+            output += '\n'
+        return output
 
 
 p0 = Plane(normal_vector=Vector(['1','1','1']), constant_term='1')
@@ -571,6 +656,29 @@ def test_guassian_elim():
     system3 = LinearSystem([p1, p2, p3, p4])
     print('third system: {} '.format(system3.do_gaussian_elimination()))
 
+def test_parameterization():
+    p1 = Plane(normal_vector=Vector([0.786, 0.786, 0.588]), constant_term=-0.714)
+    p2 = Plane(normal_vector=Vector([-0.131, -0.131, 0.244]), constant_term=0.319)
+    
+    system = LinearSystem([p1, p2])
+    print(system.compute_solution())
+    
+    
+    p1 = Plane(Vector([8.631, 5.112, -1.816]), -5.113)
+    p2 = Plane(Vector([4.315, 11.132, -5.27]), -6.775)
+    p3 = Plane(Vector([-2.158, 3.01, -1.727]), -0.831)
+    
+    system = LinearSystem([p1, p2, p3])
+    print(system.compute_solution())
+    
+    p1 = Plane(Vector([0.935, 1.76, -9.365]), -9.955)
+    p2 = Plane(Vector([0.187, 0.352, -1.873]), -1.991)
+    p3 = Plane(Vector([0.374, 0.704, -3.746]), -3.982)
+    p4 = Plane(Vector([-0.561, -1.056, 5.619]), 5.973)
+
+    system = LinearSystem([p1, p2, p3, p4])
+    print(system.compute_solution())
+
 
 def test():
     test_row_ops()
@@ -579,6 +687,7 @@ def test():
     test_rref()
     test_rref_xtra()
     test_guassian_elim()
+    test_parameterization()
 
 if __name__ == '__main__':
     test()
